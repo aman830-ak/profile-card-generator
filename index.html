@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Profile Card Generator</title>
+    
+    <!-- html2pdf Library for PDF Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            padding: 50px; 
+            background: #eef2f5; 
+            gap: 40px; 
+            flex-wrap: wrap; 
+        }
+        .form-container, .card-container { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 16px rgba(0,0,0,0.05); 
+            width: 320px; 
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #333; }
+        input, textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #dcdcdc; border-radius: 6px; font-family: inherit; }
+        button { width: 100%; padding: 12px; background: #0d6efd; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px; margin-top: 10px; }
+        button:hover { background: #0b5ed7; }
+        
+        /* Profile Card Styles */
+        .profile-card { text-align: center; display: none; padding-bottom: 10px;} 
+        .profile-card img { width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 4px solid #0d6efd; padding: 3px; }
+        .profile-card h2 { margin: 15px 0 5px; color: #212529; }
+        
+        /* Identity Badges */
+        .identity-badges { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .badge { background: #e9ecef; color: #495057; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge.dept { background: #cfe2ff; color: #084298; }
+        
+        /* Text Info */
+        .profile-card p { margin: 5px 0; font-size: 14px; color: #444; }
+        .profile-card p.bio { color: #555; font-size: 14px; line-height: 1.5; margin: 15px 0; font-style: italic;}
+        .profile-card p.join-date { font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- Input Form -->
+    <div class="form-container">
+        <h3 style="margin-top:0;">Create Profile</h3>
+        <form id="profileForm">
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="role">Role / Title</label>
+                <input type="text" id="role" placeholder="e.g. Software Engineer">
+            </div>
+            <div class="form-group">
+                <label for="department">Department</label>
+                <input type="text" id="department" placeholder="e.g. Engineering">
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="name@example.com">
+            </div>
+            <div class="form-group">
+                <label for="location">Location</label>
+                <input type="text" id="location" placeholder="e.g. New York, USA">
+            </div>
+            <div class="form-group">
+                <label for="dateOfJoin">Date of Join</label>
+                <input type="date" id="dateOfJoin">
+            </div>
+            <div class="form-group">
+                <label for="imageUrl">Image URL</label>
+                <input type="url" id="imageUrl" placeholder="https://...">
+            </div>
+            <div class="form-group">
+                <label for="bio">Short Bio *</label>
+                <textarea id="bio" rows="3" required></textarea>
+            </div>
+            
+            <button type="submit">Generate Card</button>
+        </form>
+    </div>
+
+    <!-- Output Profile Card Container -->
+    <div class="card-container">
+        <!-- The actual card to be converted to PDF -->
+        <div id="profileCard" class="profile-card">
+            <img id="cardImage" src="" alt="Profile Image">
+            <h2 id="cardName"></h2>
+            
+            <div class="identity-badges">
+                <span id="cardRole" class="badge"></span>
+                <span id="cardDept" class="badge dept"></span>
+            </div>
+
+            <p><strong>Email:</strong> <span id="cardEmail"></span></p>
+            <p><strong>Location:</strong> <span id="cardLocation"></span></p>
+            
+            <p id="cardBio" class="bio"></p>
+            <p class="join-date"><strong>Joined:</strong> <span id="cardJoinDate"></span></p>
+        </div>
+        
+        <p id="placeholderText" style="text-align: center; color: #888; margin-top: 80px;">Fill out the form to see your card.</p>
+        
+        <!-- Download Button (Hidden initially) -->
+        <button id="downloadPdfBtn" style="display: none; margin-top: 20px; background: #198754;">Download as PDF</button>
+    </div>
+
+    <script>
+        // 1. Handle Form Submission & Card Generation
+        document.getElementById('profileForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            // Safely gather payload (won't crash if an input is missing)
+            const payload = {
+                name: document.getElementById('name')?.value || '',
+                role: document.getElementById('role')?.value || '',
+                department: document.getElementById('department')?.value || '', 
+                dateOfJoin: document.getElementById('dateOfJoin')?.value || '',
+                email: document.getElementById('email')?.value || '',
+                location: document.getElementById('location')?.value || '',
+                bio: document.getElementById('bio')?.value || '',
+                imageUrl: document.getElementById('imageUrl')?.value || ''
+            };
+
+            try {
+                // Send data to Node.js backend
+                const response = await fetch('http://localhost:3000/api/generate-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const profile = data.profile;
+
+                    // Safely update UI Helper function
+                    const updateText = (id, text) => {
+                        const element = document.getElementById(id);
+                        if (element) element.textContent = text;
+                    };
+
+                    // Populate card data
+                    updateText('cardName', profile.name);
+                    updateText('cardRole', profile.role);
+                    updateText('cardDept', profile.department);
+                    updateText('cardEmail', profile.email);
+                    updateText('cardLocation', profile.location);
+                    updateText('cardBio', `"${profile.bio}"`);
+                    updateText('cardJoinDate', profile.dateOfJoin);
+
+                    // Populate Image
+                    const imgElement = document.getElementById('cardImage');
+                    if (imgElement) imgElement.src = profile.imageUrl;
+
+                    // Toggle UI Elements visibility
+                    const profileCard = document.getElementById('profileCard');
+                    if (profileCard) profileCard.style.display = 'block';
+
+                    const placeholder = document.getElementById('placeholderText');
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    const downloadBtn = document.getElementById('downloadPdfBtn');
+                    if (downloadBtn) downloadBtn.style.display = 'block';
+
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                alert('Failed to connect. Make sure your Node.js server (server.js) is running in the terminal.');
+            }
+        });
+
+        // 2. Handle PDF Download using html2pdf
+        document.getElementById('downloadPdfBtn').addEventListener('click', function() {
+            const cardElement = document.getElementById('profileCard');
+            const fileNameName = document.getElementById('cardName').textContent || 'Profile';
+
+            const options = {
+                margin:       0.5, 
+                filename:     `${fileNameName.replace(/\s+/g, '_')}_ID_Card.pdf`, 
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' }, 
+                jsPDF:        { unit: 'in', format: 'a5', orientation: 'portrait' } 
+            };
+
+            html2pdf().set(options).from(cardElement).save();
+        });
+    </script>
+</body>
+</html>
